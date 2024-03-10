@@ -5,12 +5,12 @@
 通过获取实时跑商信息并返回最佳跑商路线
 
 ### 使用方法
-将[resonanceBase.json](resonanceBase.json)放入Yunzai/data文件夹中
-将[雷索纳斯时价表查询.js]放进plugin/example文件夹即可。
-在群聊或私聊中发送 
-#时价表查询  查询所有跑商收益排行前七名
-#时价表查询+区域名  查询该区域跑商收益排行前七名
-#时价表更新   强制更新数据文件
+* 将[resonanceBase.json](resonanceBase.json)放入Yunzai/data文件夹中
+* 将[雷索纳斯时价表查询.js]放进plugin/example文件夹即可。
+* 在群聊或私聊中发送
+* #时价表查询  查询所有跑商收益排行前七名
+* #时价表查询+区域名  查询该区域跑商收益排行前七名
+* #时价表更新   强制更新数据文件
 
 
 ### 其他
