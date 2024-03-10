@@ -7,6 +7,7 @@ let jsonData;
 let baseData;
 let resonanceKey = "Yz:resonance:outTime";
 let timeStampLock;
+let n = ["修格里城", "铁盟哨站", "七号自由港", "澄明数据中心", "阿妮塔战备工厂", "阿妮塔能源研究所", "荒原站", "曼德矿场", "淘金乐园"];
 
 export class resonanceMarcket extends plugin {
   constructor () {
@@ -25,17 +26,41 @@ export class resonanceMarcket extends plugin {
           reg: '^#时价表查询(.*)$',
           /** 执行方法 */
           fnc: 'resonanceMarcketSearch'
+        },
+        {
+          /** 命令正则匹配 */
+          reg: '^#时价表更新',
+          /** 执行方法 */
+          fnc: 'updateMarcket'
         }
       ]
     })
   }
 
   /**
+   * 强制更新时价表
+   * @param e
+   * @returns {Promise<void>}
+   */
+  async updateMarcket (e) {
+    this._path = process.cwd()
+    timeStampLock = await this.refreshMarcketFile();
+  }
+  /**
    * #时价表查询
    * @param e oicq传递的事件参数e
    */
   async resonanceMarcketSearch (e) {
-
+    let emsg = e.msg.replace(/#|＃|时价表查询/g, "");
+    let hasPlace=false;
+    if (emsg){
+      if (n.includes(emsg)){
+        hasPlace=true;
+      }else {
+        this.reply("请填写正确的区域名")
+        return;
+      }
+    }
     this._path = process.cwd()
     //加锁时间
     timeStampLock = await redis.get(resonanceKey);
@@ -49,16 +74,26 @@ export class resonanceMarcket extends plugin {
     await this.readBaseFile();
     await common.sleep(1000)
 
-    //计算最佳路线
-    let n = ["修格里城", "铁盟哨站", "七号自由港", "澄明数据中心", "阿妮塔战备工厂", "阿妮塔能源研究所", "荒原站", "曼德矿场", "淘金乐园"];
     let result = [];
-    for (let p1 in n) {
-      let placeA = n[p1];
+    //计算最佳路线
+    if (hasPlace){
+      let placeA=emsg;
       for (let p2 in n) {
         let placeB = n[p2];
-        if (p1 !== p2) {
+        if (placeA !== placeB) {
           let tRevenue = this.calculateTotalProfit(placeA, placeB);
           result.push(tRevenue);
+        }
+      }
+    }else {
+      for (let p1 in n) {
+        let placeA = n[p1];
+        for (let p2 in n) {
+          let placeB = n[p2];
+          if (p1 !== p2) {
+            let tRevenue = this.calculateTotalProfit(placeA, placeB);
+            result.push(tRevenue);
+          }
         }
       }
     }
@@ -86,15 +121,17 @@ export class resonanceMarcket extends plugin {
       let name = nowPrice.name;
       let nowChange = jsonData.data[name];
       let sell = nowChange.sell[placeB];
-      if (nowPrice.type === "Special" && sell) {
+      //排除制造产物
+      if (nowPrice.type !== "Craft" && sell) {
         let buyPrice = nowPrice.buyPrices[placeA];
         let sellPrice = nowPrice.sellPrices[placeB];
         let buyLot = nowPrice.buyLot[placeA];
         let buy = nowChange.buy[placeA]
         let changeA = buy.variation;
         let changeB = sell.variation;
-        let thisTotalProduct = Math.floor(sellPrice * changeB / 100 * 1.04) - Math.floor(buyPrice * changeA / 100 * 0.92);
-        //logger.info(placeA + " " + placeB + " " + name + "收益" + thisTotalProduct * buyLot)
+        // (商品售出地基准价格x商品售出地价格浮动)×(100%-6%税+10%抬价幅度)-(商品购入地基准价格x商品购入地价格浮动)×(100%+6%税-14%砍价幅度)
+        let thisTotalProduct = Math.floor(sellPrice * changeB / 100) - Math.floor(buyPrice * changeA / 100 );
+        logger.info(placeA + " " + placeB + " " + name + "收益" + thisTotalProduct * buyLot)
         msg = msg + " " + name;
         totalProfit += thisTotalProduct * buyLot;
       }
@@ -122,16 +159,16 @@ export class resonanceMarcket extends plugin {
     };
 
     await fetch("https://www.resonance-columba.com/api/get-prices", requestOptions)
-      .then(response => response.text())
-      .then(result => {
-        fs.writeFile(`${this._path}/data/resonanceMarcket.json`, result, (err) => {
-          if (err) throw err;
-          timeStampLock = Math.floor(Date.now() / 1000); // 获取当前时间戳（单位：秒）
-          redis.set(resonanceKey, timeStampLock, { EX: 3600 });//采集信息有效期 1小时
-          this.reply(`历史数据已超时，更新数据成功`)
-        });
-      })
-      .catch(error => logger.error('error', error));
+        .then(response => response.text())
+        .then(result => {
+          fs.writeFile(`${this._path}/data/resonanceMarcket.json`, result, (err) => {
+            if (err) throw err;
+            timeStampLock = Math.floor(Date.now() / 1000); // 获取当前时间戳（单位：秒）
+            redis.set(resonanceKey, timeStampLock, { EX: 3600 });//采集信息有效期 1小时
+            this.reply(`更新数据文件成功`)
+          });
+        })
+        .catch(error => logger.error('error', error));
     return timeStampLock;
   }
 
