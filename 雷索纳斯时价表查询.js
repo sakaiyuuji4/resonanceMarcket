@@ -6,9 +6,11 @@ import common from '../../lib/common/common.js'
 let jsonData;
 let baseData;
 let resonanceKey = "Yz:resonance:outTime";
+let urlVersion = "Yz:resonance:resourceVersion";
 let timeStampLock;
 let n = ["修格里城", "铁盟哨站", "七号自由港", "澄明数据中心", "阿妮塔战备工厂", "阿妮塔能源研究所", "荒原站", "曼德矿场", "淘金乐园"];
-
+let urlV1="https://www.resonance-columba.com/api/get-prices";
+let urlV2="https://www.resonance-columba.com/api/get-prices-v2";
 export class resonanceMarcket extends plugin {
   constructor () {
     super({
@@ -29,7 +31,7 @@ export class resonanceMarcket extends plugin {
         },
         {
           /** 命令正则匹配 */
-          reg: '^#时价表更新',
+          reg: '^#时价表更新(.*)$',
           /** 执行方法 */
           fnc: 'updateMarcket'
         }
@@ -43,6 +45,14 @@ export class resonanceMarcket extends plugin {
    * @returns {Promise<void>}
    */
   async updateMarcket (e) {
+    let uVersion = e.msg.replace(/#|＃|时价表更新/g, "");
+    if (uVersion==="1"){
+      redis.set(urlVersion, "1");
+      await common.sleep(1000)
+    }else if (uVersion==="2"){
+      redis.set(urlVersion, "2");
+      await common.sleep(1000)
+    }
     this._path = process.cwd()
     timeStampLock = await this.refreshMarcketFile();
   }
@@ -120,18 +130,22 @@ export class resonanceMarcket extends plugin {
       let nowPrice = placeAMsg[i];
       let name = nowPrice.name;
       let nowChange = jsonData.data[name];
-      let sell = nowChange.sell[placeB];
+      if (!nowChange){
+        break ;
+      }
+      let sell = nowChange.sell;
+      let buy = nowChange.buy;
       //排除制造产物
-      if (nowPrice.type !== "Craft" && sell) {
+      if (nowPrice.type !== "Craft" && sell &&sell[placeB] &&buy && buy[placeA]) {
         let buyPrice = nowPrice.buyPrices[placeA];
         let sellPrice = nowPrice.sellPrices[placeB];
         let buyLot = nowPrice.buyLot[placeA];
-        let buy = nowChange.buy[placeA]
-        let changeA = buy.variation;
-        let changeB = sell.variation;
+
+        let changeA = buy[placeA].variation;
+        let changeB = sell[placeB].variation;
         // (商品售出地基准价格x商品售出地价格浮动)×(100%-6%税+10%抬价幅度)-(商品购入地基准价格x商品购入地价格浮动)×(100%+6%税-14%砍价幅度)
-        let thisTotalProduct = Math.floor(sellPrice * changeB / 100) - Math.floor(buyPrice * changeA / 100 );
-        logger.info(placeA + " " + placeB + " " + name + "收益" + thisTotalProduct * buyLot)
+        let thisTotalProduct = Math.floor(sellPrice * changeB / 100 - buyPrice * changeA / 100 );
+        //logger.info(placeA + changeA + " " + placeB + changeB + " " + name +"单个收益" + thisTotalProduct + " 收益" + thisTotalProduct * buyLot)
         msg = msg + " " + name;
         totalProfit += thisTotalProduct * buyLot;
       }
@@ -145,9 +159,14 @@ export class resonanceMarcket extends plugin {
    */
   async refreshMarcketFile () {
     var myHeaders = new Headers();
-
+    var urlV = await redis.get(urlVersion);
+    if (urlV==="2"){
+      urlV=urlV2;
+    }else {
+      urlV=urlV1;
+    }
     var selectedCities = {
-      "sourceCities": ["修格里城", "铁盟哨站", "七号自由港"],
+      "sourceCities": ["铁盟哨站", "修格里城", "澄明数据中心", "七号自由港", "阿妮塔能源研究所", "阿妮塔战备工厂", "荒原站", "曼德矿场", "淘金乐园"],
       "targetCities": ["铁盟哨站", "修格里城", "澄明数据中心", "七号自由港", "阿妮塔能源研究所", "阿妮塔战备工厂", "荒原站", "曼德矿场", "淘金乐园"]
     };
     var formattedString = JSON.stringify(selectedCities, null, 4);
@@ -158,7 +177,7 @@ export class resonanceMarcket extends plugin {
       redirect: 'follow'
     };
 
-    await fetch("https://www.resonance-columba.com/api/get-prices", requestOptions)
+    await fetch(urlV, requestOptions)
         .then(response => response.text())
         .then(result => {
           fs.writeFile(`${this._path}/data/resonanceMarcket.json`, result, (err) => {
