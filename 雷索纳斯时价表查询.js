@@ -146,8 +146,11 @@ export class resonanceMarcket extends plugin {
         // (商品售出地基准价格x商品售出地价格浮动)×(100%-6%税+10%抬价幅度)-(商品购入地基准价格x商品购入地价格浮动)×(100%+6%税-14%砍价幅度)
         let thisTotalProduct = Math.floor(sellPrice * changeB / 100 - buyPrice * changeA / 100 );
         //logger.info(placeA + changeA + " " + placeB + changeB + " " + name +"单个收益" + thisTotalProduct + " 收益" + thisTotalProduct * buyLot)
-        msg = msg + " " + name;
-        totalProfit += thisTotalProduct * buyLot;
+        //仅计算赚钱商品
+        if (thisTotalProduct>0){
+          msg = msg + " " + name;
+          totalProfit += thisTotalProduct * buyLot;
+        }
       }
     }
     return { "place": placeA + placeB, "totle": totalProfit, "product": msg }
