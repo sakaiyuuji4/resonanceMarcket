@@ -9,7 +9,6 @@ let resonanceKey = "Yz:resonance:outTime";
 let urlVersion = "Yz:resonance:resourceVersion";
 let timeStampLock;
 let n = ["修格里城", "铁盟哨站", "七号自由港", "澄明数据中心", "阿妮塔战备工厂", "阿妮塔能源研究所", "荒原站", "曼德矿场", "淘金乐园"];
-let urlV1="https://www.resonance-columba.com/api/get-prices";
 let urlV2="https://www.resonance-columba.com/api/get-prices-v2";
 export class resonanceMarcket extends plugin {
   constructor () {
@@ -46,13 +45,6 @@ export class resonanceMarcket extends plugin {
    */
   async updateMarcket (e) {
     let uVersion = e.msg.replace(/#|＃|时价表更新/g, "");
-    if (uVersion==="1"){
-      redis.set(urlVersion, "1");
-      await common.sleep(1000)
-    }else if (uVersion==="2"){
-      redis.set(urlVersion, "2");
-      await common.sleep(1000)
-    }
     this._path = process.cwd()
     timeStampLock = await this.refreshMarcketFile();
   }
@@ -162,12 +154,6 @@ export class resonanceMarcket extends plugin {
    */
   async refreshMarcketFile () {
     var myHeaders = new Headers();
-    var urlV = await redis.get(urlVersion);
-    if (urlV==="2"){
-      urlV=urlV2;
-    }else {
-      urlV=urlV1;
-    }
     var selectedCities = {
       "sourceCities": ["铁盟哨站", "修格里城", "澄明数据中心", "七号自由港", "阿妮塔能源研究所", "阿妮塔战备工厂", "荒原站", "曼德矿场", "淘金乐园"],
       "targetCities": ["铁盟哨站", "修格里城", "澄明数据中心", "七号自由港", "阿妮塔能源研究所", "阿妮塔战备工厂", "荒原站", "曼德矿场", "淘金乐园"]
@@ -180,7 +166,7 @@ export class resonanceMarcket extends plugin {
       redirect: 'follow'
     };
 
-    await fetch(urlV, requestOptions)
+    await fetch(urlV2, requestOptions)
         .then(response => response.text())
         .then(result => {
           fs.writeFile(`${this._path}/data/resonanceMarcket.json`, result, (err) => {
